@@ -74,6 +74,7 @@ class IsolationLevelApplicationTests {
                     counter.increment();
                 } catch (InterruptedException e) {
                     // Handle exception
+                    e.printStackTrace();
                 }
                 latch.countDown();
             });
