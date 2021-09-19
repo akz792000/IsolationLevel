@@ -15,7 +15,7 @@ import java.util.Optional;
  */
 @RequiredArgsConstructor
 @Service
-public class FirstDocumentService {
+public class DocumentService {
 
     private final DocumentRepository repository;
 

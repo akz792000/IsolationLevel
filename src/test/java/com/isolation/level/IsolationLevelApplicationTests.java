@@ -1,12 +1,12 @@
 package com.isolation.level;
 
 import com.isolation.level.domain.DocumentEntity;
-import com.isolation.level.service.FirstDocumentService;
-import com.isolation.level.service.SecondDocumentService;
+import com.isolation.level.service.DocumentService;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Optional;
@@ -27,10 +27,7 @@ import static org.junit.Assert.assertEquals;
 class IsolationLevelApplicationTests {
 
     @Autowired
-    FirstDocumentService first;
-
-    @Autowired
-    SecondDocumentService second;
+    private ApplicationContext applicationContext;
 
     private Object lock = new Object();
 
@@ -45,9 +42,15 @@ class IsolationLevelApplicationTests {
         service.submit(() -> {
             synchronized (lock) {
                 try {
+                    // prepare entity
                     DocumentEntity entity = new DocumentEntity();
                     entity.setName(message);
-                    first.save(entity);
+
+                    // save
+                    DocumentService documentService = applicationContext.getAutowireCapableBeanFactory().getBean(DocumentService.class);
+                    documentService.save(entity);
+
+                    // wait
                     lock.wait();
                     throw new UnsupportedOperationException("Rollback");
                 } catch (InterruptedException e) {
@@ -59,12 +62,19 @@ class IsolationLevelApplicationTests {
         });
 
         // second
-        AtomicReference<Optional<DocumentEntity>> entity = null;
+        AtomicReference<DocumentEntity> reference = new AtomicReference<>();
         service.submit(() -> {
             synchronized (lock) {
                 try {
+                    // sleep
                     Thread.sleep(2000);
-                    entity.set(second.findById(1L));
+
+                    // set reference
+                    DocumentService documentService = applicationContext.getAutowireCapableBeanFactory().getBean(DocumentService.class);
+                    Optional<DocumentEntity> optional = documentService.findById(1L);
+                    reference.set(optional.get());
+
+                    // notify
                     lock.notify();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -74,8 +84,7 @@ class IsolationLevelApplicationTests {
             }
         });
         latch.await();
-        assertEquals(entity.get(), message);
-
+        assertEquals(reference.get().getName(), message);
     }
 
 }
