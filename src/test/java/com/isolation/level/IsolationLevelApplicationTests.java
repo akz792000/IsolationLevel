@@ -1,13 +1,19 @@
 package com.isolation.level;
 
+import com.isolation.level.domain.DocumentEntity;
+import com.isolation.level.service.FirstDocumentService;
+import com.isolation.level.service.SecondDocumentService;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 
@@ -20,67 +26,56 @@ import static org.junit.Assert.assertEquals;
 @RunWith(SpringRunner.class)
 class IsolationLevelApplicationTests {
 
-    @Test
-    public void contextLoad() {
+    @Autowired
+    FirstDocumentService first;
 
-    }
+    @Autowired
+    SecondDocumentService second;
 
-    public class MyCounter {
-        private int count;
-
-        /*
-        public void increment() {
-            int temp = count;
-            count = temp + 1;
-        }
-        */
-
-        public synchronized void increment() throws InterruptedException {
-            int temp = count;
-            wait(100);
-            count = temp + 1;
-        }
-
-        public int getCount() {
-            return count;
-        }
-    }
+    private Object lock = new Object();
 
     @Test
-    public void testCounter() throws InterruptedException {
-        MyCounter counter = new MyCounter();
-        for (int i = 0; i < 500; i++) {
-            counter.increment();
-        }
-        assertEquals(500, counter.getCount());
-    }
-
-    /**
-     * This test is reasonable, as we're trying to operate on shared data with several threads.
-     * As we keep the number of threads low, like 10, we will notice that it passes almost all the time.
-     * Interestingly, if we start increasing the number of threads, say to 100, we will see that the test starts to fail most of the time.
-     *
-     * @throws InterruptedException
-     */
-    @Test
-    public void testCounterWithConcurrency() throws InterruptedException {
+    public void readUncommitted() throws InterruptedException {
         int numberOfThreads = 2;
-        ExecutorService service = Executors.newFixedThreadPool(10);
+        String message = "first";
+        ExecutorService service = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(numberOfThreads);
-        MyCounter counter = new MyCounter();
-        for (int i = 0; i < numberOfThreads; i++) {
-            service.submit(() -> {
+
+        // first
+        service.submit(() -> {
+            synchronized (lock) {
                 try {
-                    counter.increment();
+                    DocumentEntity entity = new DocumentEntity();
+                    entity.setName(message);
+                    first.save(entity);
+                    lock.wait();
+                    throw new UnsupportedOperationException("Rollback");
                 } catch (InterruptedException e) {
-                    // Handle exception
                     e.printStackTrace();
+                } finally {
+                    latch.countDown();
                 }
-                latch.countDown();
-            });
-        }
+            }
+        });
+
+        // second
+        AtomicReference<Optional<DocumentEntity>> entity = null;
+        service.submit(() -> {
+            synchronized (lock) {
+                try {
+                    Thread.sleep(2000);
+                    entity.set(second.findById(1L));
+                    lock.notify();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    latch.countDown();
+                }
+            }
+        });
         latch.await();
-        assertEquals(numberOfThreads, counter.getCount());
+        assertEquals(entity.get(), message);
+
     }
 
 }

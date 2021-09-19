@@ -4,6 +4,7 @@ import com.isolation.level.domain.DocumentEntity;
 import com.isolation.level.repository.DocumentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
@@ -14,16 +15,16 @@ import java.util.Optional;
  */
 @RequiredArgsConstructor
 @Service
-public class DocumentService {
+public class FirstDocumentService {
 
     private final DocumentRepository repository;
 
-    @Transactional(readOnly = true)
+    @Transactional(isolation = Isolation.READ_UNCOMMITTED, readOnly = true)
     public Optional<DocumentEntity> findById(Long id) {
         return repository.findById(id);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_UNCOMMITTED)
     public DocumentEntity save(DocumentEntity entity) {
         return repository.save(entity);
     }
