@@ -30,7 +30,7 @@ public class ReadUncommittedService {
     }
 
     @Transactional(isolation = Isolation.READ_UNCOMMITTED)
-    public void persist(String message) throws InterruptedException {
+    public void saveWaitRollback(String message) throws InterruptedException {
         synchronized (lock) {
             try {
                 // prepare entity
@@ -51,7 +51,7 @@ public class ReadUncommittedService {
     }
 
     @Transactional(isolation = Isolation.READ_UNCOMMITTED, readOnly = true)
-    public DocumentEntity read(Long id) {
+    public DocumentEntity readNotify(Long id) {
         synchronized (lock) {
             DocumentEntity result = null;
             Optional<DocumentEntity> optional = findById(id);

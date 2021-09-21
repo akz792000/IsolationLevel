@@ -39,7 +39,7 @@ class IsolationLevelApplicationTests {
         // first
         executor.submit(() -> {
             try {
-                service.persist(message);
+                service.saveWaitRollback(message);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -55,7 +55,7 @@ class IsolationLevelApplicationTests {
                 Thread.sleep(2000);
 
                 // read a data that will be removed by the first due to the rollback
-                reference.set(service.read(1L));
+                reference.set(service.readNotify(1L));
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -71,4 +71,5 @@ class IsolationLevelApplicationTests {
         Optional<DocumentEntity> optional = service.findById(1L);
         assertTrue(optional.isEmpty());
     }
+
 }
