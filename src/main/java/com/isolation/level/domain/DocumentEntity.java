@@ -6,6 +6,7 @@ import lombok.EqualsAndHashCode;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import java.util.Objects;
 
 /**
  * @author Ali Karimizandi
@@ -17,7 +18,10 @@ import javax.persistence.Table;
 @Table(name = "document")
 public class DocumentEntity extends BaseEntity {
 
-    @Column(name = "name")
-    private String name;
+    @Column(name = "code")
+    private Long code;
+
+    @Column(name = "message")
+    private String message;
 
 }
