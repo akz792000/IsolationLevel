@@ -23,25 +23,24 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Isolation.READ_UNCOMMITTED
- *      dirtyRead           passed
- *      nonRepeatableRead   passed
- *      phantomRead         passed
- *
+ * --> dirtyRead           passed
+ * --> nonRepeatableRead   passed
+ * --> phantomRead         passed
+ * <p>
  * Isolation.READ_COMMITTED
- *      dirtyRead           not-passed
- *      nonRepeatableRead   passed
- *      phantomRead         passed
- *
+ * --> dirtyRead           not-passed
+ * --> nonRepeatableRead   passed
+ * --> phantomRead         passed
+ * <p>
  * Isolation.REPEATABLE_READ
- *      dirtyRead           not-passed
- *      nonRepeatableRead   not-passed
- *      phantomRead         passed
- *
+ * --> dirtyRead           not-passed
+ * --> nonRepeatableRead   not-passed
+ * --> phantomRead         passed
+ * <p>
  * Isolation.SERIALIZABLE
- *      dirtyRead           not-passed
- *      nonRepeatableRead   not-passed
- *      phantomRead         not-passed
- *
+ * --> dirtyRead           not-passed
+ * --> nonRepeatableRead   not-passed
+ * --> phantomRead         not-passed
  *
  * @author Ali Karimizandi
  * @since 2021
