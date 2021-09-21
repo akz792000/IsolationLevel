@@ -1,12 +1,11 @@
 package com.isolation.level;
 
 import com.isolation.level.domain.DocumentEntity;
-import com.isolation.level.service.DocumentService;
+import com.isolation.level.service.ReadUncommittedService;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.Optional;
@@ -16,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 
 /**
@@ -27,64 +27,48 @@ import static org.junit.Assert.assertEquals;
 class IsolationLevelApplicationTests {
 
     @Autowired
-    private ApplicationContext applicationContext;
-
-    private Object lock = new Object();
+    private ReadUncommittedService service;
 
     @Test
-    public void readUncommitted() throws InterruptedException {
+    public void dirtyRead() throws InterruptedException {
         int numberOfThreads = 2;
         String message = "first";
-        ExecutorService service = Executors.newCachedThreadPool();
+        ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(numberOfThreads);
 
         // first
-        service.submit(() -> {
-            synchronized (lock) {
-                try {
-                    // prepare entity
-                    DocumentEntity entity = new DocumentEntity();
-                    entity.setName(message);
-
-                    // save
-                    DocumentService documentService = applicationContext.getAutowireCapableBeanFactory().getBean(DocumentService.class);
-                    documentService.save(entity);
-
-                    // wait
-                    lock.wait();
-                    throw new UnsupportedOperationException("Rollback");
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } finally {
-                    latch.countDown();
-                }
+        executor.submit(() -> {
+            try {
+                service.persist(message);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                latch.countDown();
             }
         });
 
         // second
         AtomicReference<DocumentEntity> reference = new AtomicReference<>();
-        service.submit(() -> {
-            synchronized (lock) {
-                try {
-                    // sleep
-                    Thread.sleep(2000);
+        executor.submit(() -> {
+            try {
+                // sure that this thread runs after the first one
+                Thread.sleep(2000);
 
-                    // set reference
-                    DocumentService documentService = applicationContext.getAutowireCapableBeanFactory().getBean(DocumentService.class);
-                    Optional<DocumentEntity> optional = documentService.findById(1L);
-                    reference.set(optional.get());
-
-                    // notify
-                    lock.notify();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } finally {
-                    latch.countDown();
-                }
+                // read a data that will be removed by the first due to the rollback
+                reference.set(service.read(1L));
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                latch.countDown();
             }
         });
         latch.await();
-        assertEquals(reference.get().getName(), message);
-    }
 
+        // sure dirty read is already existed
+        assertEquals(reference.get().getName(), message);
+
+        // satisfy that the dirty read is not exist anymore
+        Optional<DocumentEntity> optional = service.findById(1L);
+        assertTrue(optional.isEmpty());
+    }
 }
