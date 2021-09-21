@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,13 +60,26 @@ class IsolationLevelApplicationTests {
         String message = "first";
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(numberOfThreads);
+        Object lock = new Object();
 
         // first
         executor.submit(() -> {
             try {
-                service.saveWaitRollback(code, message);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                synchronized (lock) {
+                    DocumentEntity entity = new DocumentEntity();
+                    entity.setCode(code);
+                    entity.setMessage(message);
+                    service.save(entity, () -> {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+
+                        // cause to happening dirty read for second
+                        throw new UnsupportedOperationException("Rollback");
+                    });
+                }
             } finally {
                 latch.countDown();
             }
@@ -75,11 +89,21 @@ class IsolationLevelApplicationTests {
         AtomicReference<DocumentEntity> reference = new AtomicReference<>();
         executor.submit(() -> {
             try {
-                // sure that this thread runs after the first one
-                Thread.sleep(2000);
+                synchronized (lock) {
+                    // sure that this thread runs after the first one
+                    Thread.sleep(2000);
 
-                // read a data that will be removed by the first due to the rollback
-                reference.set(service.readNotify(code));
+                    // read a data that will be removed by the first due to the rollback
+                    DocumentEntity entity = null;
+                    Optional<DocumentEntity> optional = service.findByCode(code);
+                    if (optional.isPresent()) {
+                        entity = optional.get();
+                    }
+                    reference.set(entity);
+
+                    // notify
+                    lock.notify();
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -99,18 +123,27 @@ class IsolationLevelApplicationTests {
         String message = "second";
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(numberOfThreads);
+        Object lock = new Object();
 
         // prepare entity
-        DocumentEntity entity = new DocumentEntity();
-        entity.setCode(code);
-        entity.setMessage(message);
-        service.save(entity);
+        DocumentEntity newEntity = new DocumentEntity();
+        newEntity.setCode(code);
+        newEntity.setMessage(message);
+        service.save(newEntity);
 
         // first
         AtomicBoolean result = new AtomicBoolean();
         executor.submit(() -> {
             try {
-                result.set(service.readWaitRead(code));
+                synchronized (lock) {
+                    result.set(service.readWaitRead(code, () -> {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }));
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -124,8 +157,24 @@ class IsolationLevelApplicationTests {
                 // sure that this thread runs after the first one
                 Thread.sleep(2000);
 
+                synchronized (lock) {
+                    // read
+                    DocumentEntity entity = null;
+                    Optional<DocumentEntity> optional = service.findByCode(code);
+                    if (optional.isPresent()) {
+                        entity = optional.get();
+                    }
+
+                    // prepare entity
+                    entity.setMessage("random");
+                    service.save(entity);
+
+                    // notify
+                    lock.notify();
+                }
+
                 // manipulate
-                service.manipulateNotify(code, "random");
+                //service.manipulateNotify(code, "random");
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -143,6 +192,7 @@ class IsolationLevelApplicationTests {
     public void phantomRead(@Autowired DocumentService service) throws InterruptedException {
         ExecutorService executor = Executors.newCachedThreadPool();
         CountDownLatch latch = new CountDownLatch(numberOfThreads);
+        Object lock = new Object();
 
         // prepare entity
         IntStream.rangeClosed(10, 20).forEach(item -> {
@@ -156,7 +206,15 @@ class IsolationLevelApplicationTests {
         AtomicBoolean result = new AtomicBoolean();
         executor.submit(() -> {
             try {
-                result.set(service.readBunchWaitReadBunch(10L, 20L));
+                synchronized (lock) {
+                    result.set(service.readBunchWaitReadBunch(10L, 20L, () -> {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }));
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
@@ -168,10 +226,23 @@ class IsolationLevelApplicationTests {
         executor.submit(() -> {
             try {
                 // sure that this thread runs after the first one
-                Thread.sleep(4000);
+                Thread.sleep(2000);
 
-                // manipulate
-                service.manipulateNotify(15L, "random");
+                synchronized (lock) {
+                    // read
+                    DocumentEntity entity = null;
+                    Optional<DocumentEntity> optional = service.findByCode(15L);
+                    if (optional.isPresent()) {
+                        entity = optional.get();
+                    }
+
+                    // prepare entity
+                    entity.setMessage("random");
+                    service.save(entity);
+
+                    // notify
+                    lock.notify();
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } finally {
