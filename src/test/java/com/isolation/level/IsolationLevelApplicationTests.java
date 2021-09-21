@@ -68,10 +68,6 @@ class IsolationLevelApplicationTests {
 
         // sure dirty read is already existed
         assertEquals(reference.get().getName(), message);
-
-        // satisfy that the dirty read is not exist anymore
-        Optional<DocumentEntity> optional = service.findById(id);
-        assertTrue(optional.isEmpty());
     }
 
     @Test
