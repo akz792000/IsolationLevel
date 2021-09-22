@@ -21,7 +21,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Service
 @Scope(BeanDefinition.SCOPE_PROTOTYPE)
-@Transactional(isolation = Isolation.REPEATABLE_READ, propagation = Propagation.REQUIRES_NEW)
+@Transactional(isolation = Isolation.READ_UNCOMMITTED, propagation = Propagation.REQUIRES_NEW)
 public class DocumentService {
 
     private final EntityManager entityManager;
