@@ -36,9 +36,9 @@ import static org.junit.Assert.assertTrue;
  * Isolation.REPEATABLE_READ
  * --> dirtyRead           not-passed
  * --> nonRepeatableRead   not-passed
- * --> phantomRead         passed
+ * --> phantomRead         passed --> not-passed in converse of its declaration
  * <p>
- * Isolation.SERIALIZABLE
+ * Isolation.SERIALIZABLE --> due to lock we face with deadlock
  * --> dirtyRead           not-passed
  * --> nonRepeatableRead   not-passed
  * --> phantomRead         not-passed
