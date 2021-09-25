@@ -3,11 +3,12 @@ package thread_sample;
 import java.util.Scanner;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 class Runner {
 
     private int count = 0;
-    private Lock lock = new java.util.concurrent.locks.ReentrantLock();
+    private Lock lock = new ReentrantLock();
     private Condition cond = lock.newCondition();
 
     private void increment() {
@@ -56,7 +57,7 @@ class Runner {
 
 }
 
-public class ReentrantLock {
+public class SampleReentrantLock {
 
     public static void main(String[] args) throws InterruptedException {
 
