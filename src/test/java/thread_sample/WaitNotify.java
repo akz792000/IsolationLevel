@@ -1,4 +1,4 @@
-package wait_notify;
+package thread_sample;
 
 import java.util.Scanner;
 
